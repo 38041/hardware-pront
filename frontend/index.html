@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gerenciador de Hardware</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Ícones Phosphor para visual moderno -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+</head>
+<body>
+  <!-- Header principal -->
+  <header class="navbar">
+    <div class="container navbar-content">
+      <div class="brand">
+        <i class="fa-solid fa-microchip brand-icon"></i>
+        <div>
+          <h1>Hardware Manager</h1>
+          <p class="subtitle">Catálogo e Controle de Aparelhos</p>
+        </div>
+      </div>
+      <div class="api-status" id="apiStatusBadge">
+        <span class="status-dot"></span>
+        <span class="status-text">Verificando API...</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container main-content">
+    <!-- Painel de Notificações / Toast -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <!-- Layout Grid: Formulário + Listagem -->
+    <div class="content-grid">
+      <!-- Formulário de Cadastro / Edição -->
+      <section class="card form-section">
+        <div class="section-header">
+          <h2 id="formTitle">
+            <i class="fa-solid fa-plus-circle"></i> Cadastrar Aparelho
+          </h2>
+          <button type="button" id="btnCancelEdit" class="btn btn-secondary btn-sm hidden">
+            <i class="fa-solid fa-xmark"></i> Cancelar Edição
+          </button>
+        </div>
+
+        <form id="hardwareForm" novalidate>
+          <input type="hidden" id="hardwareId" />
+
+          <div class="form-group">
+            <label for="hardwareInput">
+              Tipo / Nome do Hardware <span class="required">*</span>
+            </label>
+            <div class="input-icon-wrapper">
+              <i class="fa-solid fa-server input-icon"></i>
+              <input
+                type="text"
+                id="hardwareInput"
+                placeholder="Ex.: Placa de Vídeo, Notebook, Processador"
+                required
+                maxlength="100"
+              />
+            </div>
+            <small class="field-error" id="errorHardware"></small>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="marcaInput">
+                Marca / Fabricante <span class="required">*</span>
+              </label>
+              <div class="input-icon-wrapper">
+                <i class="fa-solid fa-building input-icon"></i>
+                <input
+                  type="text"
+                  id="marcaInput"
+                  placeholder="Ex.: NVIDIA, Dell, AMD"
+                  required
+                  maxlength="100"
+                />
+              </div>
+              <small class="field-error" id="errorMarca"></small>
+            </div>
+
+            <div class="form-group">
+              <label for="modeloInput">
+                Modelo <span class="required">*</span>
+              </label>
+              <div class="input-icon-wrapper">
+                <i class="fa-solid fa-tag input-icon"></i>
+                <input
+                  type="text"
+                  id="modeloInput"
+                  placeholder="Ex.: RTX 4070 Ti, G15"
+                  required
+                  maxlength="100"
+                />
+              </div>
+              <small class="field-error" id="errorModelo"></small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="precoInput">
+              Preço (R$) <span class="required">*</span>
+            </label>
+            <div class="input-icon-wrapper">
+              <span class="currency-prefix">R$</span>
+              <input
+                type="number"
+                id="precoInput"
+                step="0.01"
+                min="0"
+                placeholder="0,00"
+                required
+              />
+            </div>
+            <small class="field-error" id="errorPreco"></small>
+          </div>
+
+          <div class="form-group">
+            <label for="fotoInput">
+              URL da Imagem / Foto <span class="optional">(opcional)</span>
+            </label>
+            <div class="input-icon-wrapper">
+              <i class="fa-solid fa-image input-icon"></i>
+              <input
+                type="url"
+                id="fotoInput"
+                placeholder="https://exemplo.com/imagem.jpg"
+              />
+            </div>
+            <small class="field-error" id="errorFoto"></small>
+          </div>
+
+          <!-- Pré-visualização de imagem -->
+          <div id="imagePreviewContainer" class="image-preview-container hidden">
+            <span class="preview-label">Pré-visualização da Foto:</span>
+            <div class="preview-box">
+              <img id="imagePreview" src="" alt="Pré-visualização" />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="btnSubmitForm" class="btn btn-primary">
+              <i class="fa-solid fa-floppy-disk"></i> Salvar Aparelho
+            </button>
+            <button type="reset" id="btnResetForm" class="btn btn-outline">
+              <i class="fa-solid fa-eraser"></i> Limpar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Seção da Listagem de Aparelhos -->
+      <section class="list-section">
+        <!-- Barra de Ações: Busca, Filtro e Contador -->
+        <div class="list-controls card">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Buscar por hardware, marca ou modelo..."
+            />
+          </div>
+          <div class="controls-right">
+            <span class="items-count" id="itemsCountBadge">0 aparelhos</span>
+            <button id="btnRefreshList" class="btn btn-icon" title="Recarregar lista">
+              <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Feedback de Carregamento (Loading State) -->
+        <div id="loadingState" class="state-container hidden">
+          <div class="spinner"></div>
+          <p>Carregando aparelhos de hardware...</p>
+        </div>
+
+        <!-- Feedback de Erro (Error State) -->
+        <div id="errorState" class="state-container card error-card hidden">
+          <i class="fa-solid fa-triangle-exclamation state-icon error-color"></i>
+          <h3>Não foi possível carregar os dados</h3>
+          <p id="errorMessageText">Verifique se o backend está em execução.</p>
+          <button id="btnRetryLoad" class="btn btn-primary btn-sm">
+            <i class="fa-solid fa-rotate-right"></i> Tentar Novamente
+          </button>
+        </div>
+
+        <!-- Feedback de Lista Vazia (Empty State) -->
+        <div id="emptyState" class="state-container card empty-card hidden">
+          <i class="fa-solid fa-box-open state-icon"></i>
+          <h3>Nenhum aparelho encontrado</h3>
+          <p>Cadastre seu primeiro hardware no formulário ao lado.</p>
+        </div>
+
+        <!-- Grade de Cards de Aparelhos -->
+        <div id="hardwareGrid" class="hardware-grid"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Modal de Confirmação de Exclusão -->
+  <div id="deleteModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <i class="fa-solid fa-triangle-exclamation modal-icon-warn"></i>
+        <h3>Confirmar Exclusão</h3>
+      </div>
+      <p class="modal-body">
+        Deseja realmente excluir o aparelho <strong id="deleteTargetName"></strong>?
+        Esta ação não pode ser desfeita.
+      </p>
+      <div class="modal-actions">
+        <button id="btnCancelDelete" class="btn btn-secondary">Cancelar</button>
+        <button id="btnConfirmDelete" class="btn btn-danger">
+          <i class="fa-solid fa-trash"></i> Sim, Excluir
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="container footer-content">
+      <p>Mini Sistema de Gerenciamento de Hardware &copy; 2026</p>
+      <p class="footer-links">
+        <span>Backend: Node.js &bull; MongoDB</span>
+        <span>Frontend: HTML/CSS/JS Puro</span>
+      </p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
